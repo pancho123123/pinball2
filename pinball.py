@@ -1,13 +1,15 @@
-import pygame, random
+import pygame, random, math
 from random import randint
 from pathlib import Path
+from abc import ABC, abstractmethod
+
 
 WIDTH = 450
 HEIGHT = 600
 BLACK = (0, 0, 0)
 WHITE = ( 255, 255, 255)
-#GREEN = (0, 255, 0)
-#RED = (255,0,0)
+GREEN = (0, 255, 0)
+RED = (255,0,0)
 #BLUE = (0,0,255)
 
 
@@ -32,6 +34,137 @@ def draw_text2(surface, text, size, x, y):
 	text_rect = text_surface.get_rect()
 	text_rect.midtop = (x, y)
 	surface.blit(text_surface, text_rect)
+
+arc_rect = screen.get_rect().move(0,HEIGHT/2)
+arc_center = arc_rect.center
+arc_radio = min(arc_rect.size)/2
+arc_start = math.pi/6 #30°
+arc_stop = 2*math.pi/3 #120°
+
+def direction(a,b):
+	#x,y vector from a to b
+	if hasattr(a,'rect'):
+		xa = a.rect.centerx
+		ya = a.rect.centery
+	else:
+		xa, ya = a
+	if hasattr(b,'rect'):
+		xb = b.rect.centerx
+		yb = b.rect.centery
+	else:
+		xb, yb = b
+	dx = xb -xa
+	dy = yb - ya
+	return dx, dy
+
+def distance(a,b):
+	#pitagoras distance between a and b
+	dx, dy = direction(a,b)
+	return (dx**2 + dy**2)**(1/2)
+
+def reflection(normal, i_vector):
+	'i_vector reflection with normal vector.'
+	alpha = complex(*normal) / abs(complex(*normal))
+	incidence =complex(*i_vector) / abs(complex(*i_vector))
+	rotated = -complex(*i_vector) * (alpha/incidence)**2
+	return rotated.real, rotated.imag
+
+# Wall abstract base class, not intended tu instantiate.
+# use the specific wall classes below
+# CircunWall,
+class Wall(ABC):
+
+	@abstractmethod
+	def draw(self, surface):
+		pass
+
+	@abstractmethod
+	def collide(self, o):
+		pass
+
+	@abstractmethod
+	def bounce(self, o):
+		pass
+
+	def move_to_safe(self, o):
+		while self.collide(o):
+			o.rect.x += o.speedx
+			o.rect.y += o.speedy
+
+class CircunWall(Wall):
+	def __init__(self, center, radio, color=WHITE):
+		self.center = center
+		self.radio = radio
+		self.color = color
+
+	def draw(self, surface):
+		pygame.draw.circle(surface, self.color, self.center, self.radio)
+
+	def collide(self, o):
+		centers_distance = distance(o.rect.center, self.center)
+		distance_to_circunf = self.radio - centers_distance
+		return -o.radio < distance_to_circunf < o.radio
+
+	def bounce(self, o):
+		normal = direction(self.center, o.rect.center)
+		i_vector = o.speedx , o.speedy
+		o.speedx, o.speedy = reflection(normal, i_vector)
+
+class ArcWall(Wall):
+	def __init__(self, center, radio, start, stop, color=WHITE):
+		self.center = center
+		self.radio = radio
+		diam = 2*radio
+		self.rect = pygame.Rect(center, (diam, diam)).move(-radio, -radio)
+		self.start = start
+		self.stop = stop
+		self.color = color
+
+	def draw(self, surface):
+		pygame.draw.arc(surface, self.color, self.rect, -self.stop, -self.start )
+
+	def collide(self, o):
+		colliding = False
+		o_rel_x, o_rel_y = direction(self.center, o)
+		o_angle = math.atan2(o_rel_y, o_rel_x)
+		if o_angle < 0:
+			o_angle += math.tau
+		if self.start <= o_angle <= self.stop:
+			centers_distance = distance(o.rect.center, arc_center)
+			distance_to_circunf = self.radio - centers_distance
+			colliding = -o.radio < distance_to_circunf < o.radio
+		return colliding
+
+	def bounce(self, o):
+		normal = direction(self.center, o.rect.center)
+		i_vector = o.speedx, o.speedy
+		o.speedx, o.speedy = reflection(normal, i_vector)
+
+class LineWall(Wall):
+	def __init__(self, start, stop, color=WHITE):
+		self.start = start
+		self.stop = stop
+		self.color = color
+
+	def draw(self, surface):
+		pygame.draw.line(surface, self.color, self.start, self.stop)
+
+	def collide(self, o):
+		p = complex(*direction(self.start, o.rect.center))
+		ba = complex(*direction(self.start, self.stop))
+		pba = p/ba
+		if 0 <= pba.real <= 1:
+			line_distance = abs(pba.imag*abs(ba))
+		else:
+			line_distance = min(
+				distance(self.start, o.rect.center), 
+				distance(self.stop, o.rect.center))
+		return line_distance < o.radio
+
+	def bounce(self, o):
+		normal = direction(self.start, self.stop)
+		i_vector = -o.speedx, -o.speedy
+		o.speedx, o.speedy = reflection(normal, i_vector)
 
 class RightB(pygame.sprite.Sprite):
 	def __init__(self):
@@ -76,24 +209,24 @@ class LeftB(pygame.sprite.Sprite):
 class Ball(pygame.sprite.Sprite):
 	def __init__(self):
 		super().__init__()
-		self.image = pygame.image.load("img/Ball1.png").convert()
+		self.image = pygame.image.load("img/Ball1.png").convert_alpha()
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
-		self.rect.x = 400
-		self.rect.y = 550
-		self.start_position = 200, 50
+		self.rect.center = screen.get_rect().center
+		self.rect.x, self.rect.y = 400, 570
+		self.start_position = 400, 570
+		self.radio = self.rect.w/2
 		self.speedy = 0
-		self.speedx = 0
+		self.speedx = 1
 		self.jumping = False
 		self.Y_GRAVITY = 1
 		self.JUMP_HEIGHT = 35
 		self.Y_VELOCITY = self.JUMP_HEIGHT
-		self.speed = (((self.speedx)**2)+((self.speedy)**2))**(1/2)
 		self.counter1 = False
 		self.counter2 = False
 		self.counter3 = False
 		self.counter4 = False
-    
+
 	def update(self):
 		self.rect.x += self.speedx
 		self.rect.y += self.speedy
@@ -139,7 +272,7 @@ class Bumper3(Bumper):
 class Borde1(pygame.sprite.Sprite):# vertical izquierda
 	def __init__(self):
 		super().__init__()
-		self.image = pygame .transform.scale(pygame.image.load("img/borde.png"),(1,600)).convert()
+		self.image = pygame.transform.scale(pygame.image.load("img/borde.png"),(1,600)).convert()
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
 		self.rect.x = 0
@@ -148,7 +281,7 @@ class Borde1(pygame.sprite.Sprite):# vertical izquierda
 class Borde2(pygame.sprite.Sprite):# vertical derecha
 	def __init__(self):
 		super().__init__()
-		self.image = pygame .transform.scale(pygame.image.load("img/borde.png"),(1,600)).convert()
+		self.image = pygame.transform.scale(pygame.image.load("img/borde.png"),(1,600)).convert()
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
 		self.rect.x = 450
@@ -157,7 +290,7 @@ class Borde2(pygame.sprite.Sprite):# vertical derecha
 class Borde3(pygame.sprite.Sprite):# horizontal arriba
 	def __init__(self):
 		super().__init__()
-		self.image = pygame .transform.scale(pygame.image.load("img/borde.png"),(450,1)).convert()
+		self.image = pygame.transform.scale(pygame.image.load("img/borde.png"),(450,1)).convert()
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
 		self.rect.x = 0
@@ -166,7 +299,7 @@ class Borde3(pygame.sprite.Sprite):# horizontal arriba
 class Borde4(pygame.sprite.Sprite):#vertical entremedio
 	def __init__(self):
 		super().__init__()
-		self.image = pygame .transform.scale(pygame.image.load("img/borde.png"),(1,450)).convert()
+		self.image = pygame.transform.scale(pygame.image.load("img/borde.png"),(1,450)).convert()
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
 		self.rect.x = 380
@@ -175,25 +308,25 @@ class Borde4(pygame.sprite.Sprite):#vertical entremedio
 class Borde5(pygame.sprite.Sprite):# inf1
 	def __init__(self):
 		super().__init__()
-		self.image = pygame .transform.scale(pygame.image.load("img/bordeinf1.png"),(125,125)).convert()
+		self.image =  pygame.transform.rotate(diagonal_izquierda, -45)
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
 		self.rect.x = 0
 		self.rect.y = 400
 
-class Borde6(pygame.sprite.Sprite):# inf2
+class Borde6(pygame.sprite.Sprite):# diagonal inf derecha
 	def __init__(self):
 		super().__init__()
-		self.image = pygame .transform.scale(pygame.image.load("img/bordeinf2.png"),(60,60)).convert()
+		self.image = pygame.transform.rotate(diagonal_derecha, 45)
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
 		self.rect.x = 325
 		self.rect.y = 475
 
-class Borde7(pygame.sprite.Sprite):# horizontal arriba
+class Borde7(pygame.sprite.Sprite):# horizontal inf der
 	def __init__(self):
 		super().__init__()
-		self.image = pygame .transform.scale(pygame.image.load("img/borde.png"),(50,1)).convert()
+		self.image = pygame.transform.scale(pygame.image.load("img/borde.png"),(50,1)).convert()
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
 		self.rect.x = 400
@@ -202,7 +335,7 @@ class Borde7(pygame.sprite.Sprite):# horizontal arriba
 class Curva(pygame.sprite.Sprite):
 	def __init__(self):
 		super().__init__()
-		self.image = pygame .transform.scale(pygame.image.load("img/curva.png"),(140,160)).convert()
+		self.image = pygame.transform.scale(pygame.image.load("img/curva.png"),(140,160)).convert()
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
 		self.rect.x = 310
@@ -260,13 +393,24 @@ try:
 except:
 	highest_score = 0
 
-# Cargar imagen de fondo
+# Cargar imagenes
+diagonal_derecha = pygame.transform.scale(pygame.image.load("img/borde.png"),(76,1))
+diagonal_izquierda = pygame.transform.scale(pygame.image.load("img/borde.png"),(177,1))
+
 background = pygame.transform.scale(pygame.image.load("img/fond.png").convert(),(450,600))
 
 
 game_over = False
 running = True
 start = True
+
+circle1 = CircunWall((225,215), 24, RED)
+circle2 = CircunWall((185,285), 24, RED)
+circle3 = CircunWall((265,285), 24, RED)
+arc = ArcWall((350,150),100 , 270*math.pi/180, 5*math.pi/180  , RED)
+line1 = LineWall((0,470), (150,550), RED)
+line2 = LineWall((300,530), (370,500), RED)
+walls = [circle1, circle2, circle3, arc, line1, line2]
 while running:
 	screen.fill(BLACK)
 	if game_over:
@@ -359,10 +503,16 @@ while running:
 			
 		score = 0
 		
+
+	for w in walls:
+		w.draw(screen)
+	
 	clock.tick(60)
 	for event in pygame.event.get():
 		if event.type == pygame.QUIT:
 			running = False
+
+	
 
 	if ball.jumping:
 		ball.rect.bottom -= ball.Y_VELOCITY
@@ -371,23 +521,15 @@ while running:
 			ball.jumping = False
 			ball.Y_VELOCITY = ball.JUMP_HEIGHT	
 
-	if ball.speedx > 0:
-		print("der")
-		ball.counter1 = True
-	if ball.speedx < 0:
-		print("izq")
-		ball.counter2 = True
-	if ball.speedy > 0:
-		print("abajo")
-		ball.counter3 = True
-	if ball.speedy < 0:
-		print("arriba")
-		ball.counter4 = True
 	
 	all_sprites.update()
+	for w in walls:
+		if w.collide(ball):
+			w.bounce(ball)
+			w.move_to_safe(ball)
 
 	# termino del juego por borde inferior
-	if ball.rect.top > 601:
+	if ball.rect.top > 610:
 		game_over = True
 
 	
@@ -412,33 +554,45 @@ while running:
 	for hit in hits:
 		#print(ball.speed)
 		score += 80
-		ball.speedx = -ball.speedx
-		ball.speedy = -ball.speedy
 		
 	# Checar colisiones - ball - bumper3
 	hits = pygame.sprite.spritecollide(ball, bumper2_list, False)
 	for hit in hits:
 		#print(ball.speed)
 		score += 80
-		ball.speedx = -ball.speedx
-		ball.speedy = -ball.speedy
 	
 	# Checar colisiones - ball - bumper3
 	hits = pygame.sprite.spritecollide(ball, bumper3_list, False)
 	for hit in hits:
 		#print(ball.speed)
 		score += 80
-		ball.speedx = -ball.speedx
-		ball.speedy = -ball.speedy
 
-	# Checar colisiones - ball - borde1 borde2
-	hits = pygame.sprite.spritecollide(ball, borde_list1, False)
-	for hit in hits:
+	# Checar colisiones - ball - borde1
+	if pygame.sprite.collide_rect(ball, borde1):
+		ball.rect.left = borde1.rect.right
+		ball.speedx = -ball.speedx
+	# Checar colisiones - ball - borde2
+	if pygame.sprite.collide_rect(ball, borde2):
+		ball.rect.right = borde2.rect.left
 		ball.speedx = -ball.speedx
 			
 	# Checar colisiones - ball - borde3
-	hits = pygame.sprite.spritecollide(ball, borde_list2, False)
-	for hit in hits:
+	if pygame.sprite.collide_rect(ball,borde3):
+		ball.rect.top = borde3.rect.bottom
+		ball.speedy = -ball.speedy
+	
+	# Checar colisiones - ball - borde4
+	if pygame.sprite.collide_rect(ball, borde4):
+		if ball.speedx > 0:
+			ball.rect.right = borde4.rect.left
+			ball.speedx = -ball.speedx
+		if ball.speedx < 0:
+			ball.rect.left = borde4.rect.right
+			ball.speedx = -ball.speedx
+	
+	# Checar colisiones - ball - borde7
+	if pygame.sprite.collide_rect(ball,borde7):
+		ball.rect.bottom = borde7.rect.top
 		ball.speedy = -ball.speedy
 		
 	screen.blit(background, [0, 0])
