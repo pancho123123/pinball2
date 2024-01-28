@@ -1,4 +1,4 @@
-import pygame, random, math
+import pygame, random, math, sys
 from random import randint
 from pathlib import Path
 from abc import ABC, abstractmethod
@@ -139,6 +139,8 @@ class ArcWall(Wall):
 		o_angle = math.atan2(o_rel_y, o_rel_x)
 		if o_angle < 0:
 			o_angle += math.tau
+		elif self.stop >= math.tau:
+			o_angle += math.tau
 		if self.start <= o_angle <= self.stop:
 			centers_distance = distance(o.rect.center, self.center)
 			distance_to_circunf = self.radio - centers_distance
@@ -233,11 +235,11 @@ class Ball(pygame.sprite.Sprite):
 		self.start_position = 400, 570
 		self.radio = self.rect.w/2
 		self.speedy = 0
-		self.speedx = 2
-		self.jumping = False
-		self.Y_GRAVITY = 1
-		self.JUMP_HEIGHT = 35
-		self.Y_VELOCITY = self.JUMP_HEIGHT
+		self.speedx = 0
+		self.can_jump = True
+		self.JUMP_HEIGHT = 20
+		# self.Y_GRAVITY = 1
+		# self.Y_VELOCITY = self.JUMP_HEIGHT
 		self.counter1 = False
 		self.counter2 = False
 		self.counter3 = False
@@ -261,11 +263,11 @@ class Ball(pygame.sprite.Sprite):
 		if self.rect.y < 0:
 			self.speedy = -self.speedy
 		
-		
-		keystate = pygame.key.get_pressed()
-		if keystate[pygame.K_SPACE]:
-			if self.rect.x > 390 and self.rect.y > 570:
-				self.jumping = True
+		if self.can_jump:
+			keystate = pygame.key.get_pressed()
+			if keystate[pygame.K_SPACE]:
+				self.can_jump = False
+				self.speedy = -self.JUMP_HEIGHT
 
 class Bumper(pygame.sprite.Sprite):
 	def __init__(self):
@@ -565,23 +567,23 @@ while running:
 	clock.tick(60)
 	
 	
-
-	if ball.jumping:
-		ball.rect.bottom -= ball.Y_VELOCITY
-		ball.Y_VELOCITY -= ball.Y_GRAVITY
-		if ball.Y_VELOCITY < - ball.JUMP_HEIGHT:
-			ball.jumping = False
-			ball.Y_VELOCITY = ball.JUMP_HEIGHT	
-
+ # 
+	# if ball.jumping:
+	# 	ball.rect.bottom -= ball.Y_VELOCITY
+	# 	ball.Y_VELOCITY -= ball.Y_GRAVITY
+	# 	if ball.Y_VELOCITY < - ball.JUMP_HEIGHT:
+	# 		ball.jumping = False
+	# 		ball.Y_VELOCITY = ball.JUMP_HEIGHT
 	
 	all_sprites.update()
 	for w in walls:
 		if w.collide(ball):
-			if w is circle1 or circle2 or circle3:
+			if w in [circle1, circle2, circle3]:
 				w.bounce(ball, impulse = 1.7)
 				score += 80
+			else:
+				w.bounce(ball)
 			w.move_to_safe(ball)
-			#if w in [circle1,circle2,circle3]:
 						
 
 	# termino del juego por borde inferior
