@@ -208,7 +208,7 @@ class LeftB(pygame.sprite.Sprite):
 		self.image = pygame.transform.scale(pygame.image.load("img/leftbumper1.png"),(100,100)).convert()
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
-		self.rect.x = 120
+		self.rect.x = 70
 		self.rect.y = 510
 		
 	def update(self):
@@ -234,10 +234,8 @@ class Ball(pygame.sprite.Sprite):
 		self.radio = self.rect.w/2
 		self.speedy = 0
 		self.speedx = 2
-		self.jumping = False
-		self.Y_GRAVITY = 1
-		self.JUMP_HEIGHT = 35
-		self.Y_VELOCITY = self.JUMP_HEIGHT
+		self.can_jump = True
+		self.JUMP_HEIGHT = 20
 		self.counter1 = False
 		self.counter2 = False
 		self.counter3 = False
@@ -248,24 +246,27 @@ class Ball(pygame.sprite.Sprite):
 		self.rect.y += self.speedy
 		self.speedy += 0.1
 		if self.speedy < 0:
-			self.speedy += 0.005*abs(self.speedy)
+			self.speedy += 0.002*abs(self.speedy**2)
 		if self.speedy > 0:
-			self.speedy -= 0.005*abs(self.speedy)
+			self.speedy -= 0.002*abs(self.speedy**2)
 		if self.speedx < 0:
-			self.speedx += 0.005*abs(self.speedx)
+			self.speedx += 0.002*abs(self.speedx**2)
 		if self.speedx > 0:
-			self.speedx -= 0.005*abs(self.speedx)
+			self.speedx -= 0.002*abs(self.speedx**2)
 		
-		if self.rect.x < 0 or self.rect.x > 450:
-			self.speedx = -self.speedx
-		if self.rect.y < 0:
-			self.speedy = -self.speedy
+		#if self.rect.x < 0 or self.rect.x > 450:
+		#	self.speedx = -self.speedx
+		#if self.rect.y < 0:
+		#	self.speedy = -self.speedy
+
+		if self.can_jump:
+			keystate = pygame.key.get_pressed()
+			if keystate[pygame.K_SPACE]:
+				self.can_jump = False
+				self.speedy = -self.JUMP_HEIGHT
 		
-		
-		keystate = pygame.key.get_pressed()
-		if keystate[pygame.K_SPACE]:
-			if self.rect.x > 390 and self.rect.y > 570:
-				self.jumping = True
+			#if self.rect.x > 390 and self.rect.y > 570:
+				#self.jumping = True
 
 class Bumper(pygame.sprite.Sprite):
 	def __init__(self):
@@ -340,11 +341,11 @@ class Borde4(pygame.sprite.Sprite):#vertical entremedio
 class Borde5(pygame.sprite.Sprite):# inf1
 	def __init__(self):
 		super().__init__()
-		self.image =  pygame.transform.rotate(diagonal_izquierda, -45)
+		self.image =  pygame.transform.rotate(diagonal_izquierda, -40)
 		self.image.set_colorkey(WHITE)
 		self.rect = self.image.get_rect()
 		self.rect.x = 0
-		self.rect.y = 400
+		self.rect.y = 450
 
 class Borde6(pygame.sprite.Sprite):# diagonal inf derecha
 	def __init__(self):
@@ -436,7 +437,7 @@ except:
 
 # Cargar imagenes
 diagonal_derecha = pygame.transform.scale(pygame.image.load("img/borde.png"),(76,1))
-diagonal_izquierda = pygame.transform.scale(pygame.image.load("img/borde.png"),(177,1))
+diagonal_izquierda = pygame.transform.scale(pygame.image.load("img/borde.png"),(110,1))
 
 background = pygame.transform.scale(pygame.image.load("img/fond.png").convert(),(450,600))
 
@@ -445,12 +446,12 @@ game_over = False
 running = True
 start = True
 
-circle1 = CircunWall((225,215), 23, RED)
-circle2 = CircunWall((185,285), 23, RED)
-circle3 = CircunWall((265,285), 23, RED)
+circle1 = CircunWall((225,215), 24, RED)
+circle2 = CircunWall((185,285), 24, RED)
+circle3 = CircunWall((265,285), 24, RED)
 arc1 = ArcWall((350,150),100 , 270*math.pi/180, 5*math.pi/180  , RED)
 arc2 = ArcWall((290,200),100 , 270*math.pi/180, 5*math.pi/180  , RED)
-line1 = LineWall((0,404), (150,550), RED)
+line1 = LineWall((0,450), (80,510), RED)
 line2 = LineWall((300,550), (380,475), RED)
 walls = [circle1, circle2, circle3, arc1, arc2, line1, line2]
 counter = True
@@ -461,7 +462,7 @@ while running:
 			pygame.quit()
 			sys.exit()
 
-	screen.fill(BLACK)
+	screen.fill(WHITE)
 	if game_over:
 
 		show_game_over_screen()
@@ -469,15 +470,9 @@ while running:
 		game_over = False
 		screen.fill(BLACK)
 		all_sprites = pygame.sprite.Group()
-		bumper1_list = pygame.sprite.Group()
-		bumper2_list = pygame.sprite.Group()
-		bumper3_list = pygame.sprite.Group()
 		left_list = pygame.sprite.Group() 
 		right_list = pygame.sprite.Group() 
-		borde_list1 = pygame.sprite.Group()
-		borde_list2 = pygame.sprite.Group()
-		borde_list3 = pygame.sprite.Group()
-
+		
 		rightb = RightB()
 		leftb = LeftB()
 		ball = Ball()
@@ -494,21 +489,13 @@ while running:
 		borde8 = Borde8()
 		curva = Curva()
 		all_sprites.add(borde1, borde2, borde3, borde4, borde5, borde6, borde7, borde8, curva)
-		borde_list1.add(borde1, borde2, borde4, borde5, borde6, curva)
-		borde_list2.add(borde3, borde5, borde6, borde7, curva)
-		borde_list3.add(borde8)
-
-		
+				
 		bumper1 = Bumper1()
 		bumper2 = Bumper2()
 		bumper3 = Bumper3()
 			
 		all_sprites.add(bumper1, bumper2, bumper3)
-		bumper1_list.add(bumper1)
-		bumper2_list.add(bumper2)
-		bumper3_list.add(bumper3)
-
-				
+		
 		score = 0
 
 	if start:
@@ -518,15 +505,9 @@ while running:
 		start = False
 		screen.fill(BLACK)
 		all_sprites = pygame.sprite.Group()
-		bumper1_list = pygame.sprite.Group()
-		bumper2_list = pygame.sprite.Group()
-		bumper3_list = pygame.sprite.Group()
 		left_list = pygame.sprite.Group() 
 		right_list = pygame.sprite.Group()
-		borde_list1 = pygame.sprite.Group()
-		borde_list2 = pygame.sprite.Group()
-		borde_list3 = pygame.sprite.Group()
-		
+			
 		rightb = RightB()
 		leftb = LeftB()
 		ball = Ball()
@@ -543,18 +524,12 @@ while running:
 		borde8 = Borde8()
 		curva = Curva()
 		all_sprites.add(borde1, borde2, borde3, borde4, borde5, borde6, borde7, borde8, curva)
-		borde_list1.add(borde1, borde2, borde4, borde5, borde6, curva)
-		borde_list2.add(borde3, borde5, borde6, borde7, curva)
-		borde_list3.add(borde8)
 		
 		bumper1 = Bumper1()
 		bumper2 = Bumper2()
 		bumper3 = Bumper3()
 			
 		all_sprites.add(bumper1, bumper2, bumper3)
-		bumper1_list.add(bumper1)
-		bumper2_list.add(bumper2)
-		bumper3_list.add(bumper3)
 			
 		score = 0
 		
@@ -564,24 +539,16 @@ while running:
 	
 	clock.tick(60)
 	
-	
-
-	if ball.jumping:
-		ball.rect.bottom -= ball.Y_VELOCITY
-		ball.Y_VELOCITY -= ball.Y_GRAVITY
-		if ball.Y_VELOCITY < - ball.JUMP_HEIGHT:
-			ball.jumping = False
-			ball.Y_VELOCITY = ball.JUMP_HEIGHT	
-
-	
 	all_sprites.update()
 	for w in walls:
 		if w.collide(ball):
-			if w is circle1 or circle2 or circle3:
-				w.bounce(ball, impulse = 1.7)
+			if w in [circle1,circle2,circle3]:
+				w.bounce(ball, impulse = 1.3)
 				score += 80
+			else:
+				w.bounce(ball)
 			w.move_to_safe(ball)
-			#if w in [circle1,circle2,circle3]:
+			#if w 
 						
 
 	# termino del juego por borde inferior
@@ -594,35 +561,61 @@ while running:
 	for hit in hits:
 		keystate = pygame.key.get_pressed()
 		if keystate[pygame.K_a]:
-			ball.speedx = -ball.speedx
-			ball.speedy -= 2
+			ball.speedy -= 7
 		
 	# Checar colisiones - ball- right
 	hits = pygame.sprite.spritecollide(ball, right_list, False)
 	for hit in hits:
 		keystate = pygame.key.get_pressed()
 		if keystate[pygame.K_d]:
+			ball.speedy -= 7
+
+	# Checar colisiones - ball - left
+	if pygame.sprite.collide_rect(ball,leftb):
+		if ball.speedy > 0:
+			ball.rect.bottom = leftb.rect.top
+			ball.speedy = -ball.speedy
+			ball.speedx += 2
+
+	# Checar colisiones - ball - right
+	if pygame.sprite.collide_rect(ball,rightb):
+		if ball.speedy > 0:
+			ball.rect.bottom = rightb.rect.top
+			ball.speedy = -ball.speedy
+			ball.speedx -= 2
+
+	# Checar colisiones - ball - borde1
+	if pygame.sprite.collide_rect(ball,borde1):
+		if ball.speedx < 0:
+			ball.rect.left = borde1.rect.right
 			ball.speedx = -ball.speedx
-			ball.speedy -= 2
+
+	# Checar colisiones - ball - borde2
+	if pygame.sprite.collide_rect(ball,borde2):
+		if ball.speedx > 0:
+			ball.rect.right = borde2.rect.left
+			ball.speedx = -ball.speedx
 
 	# Checar colisiones - ball - borde3
 	if pygame.sprite.collide_rect(ball,borde3):
-		ball.rect.top = borde3.rect.bottom
-		ball.speedy = -ball.speedy
+		if ball.speedy < 0:
+			ball.rect.top = borde3.rect.bottom
+			ball.speedy = -ball.speedy
 	
 	# Checar colisiones - ball - borde4
 	if pygame.sprite.collide_rect(ball, borde4):
 		if ball.speedx > 0:
 			ball.rect.right = borde4.rect.left
 			ball.speedx = -ball.speedx
-		if ball.speedx < 0:
+		else:
 			ball.rect.left = borde4.rect.right
 			ball.speedx = -ball.speedx
 	
 	# Checar colisiones - ball - borde7
 	if pygame.sprite.collide_rect(ball,borde7):
-		ball.rect.bottom = borde7.rect.top
-		ball.speedy = -ball.speedy
+		if ball.speedy > 0:
+			ball.rect.bottom = borde7.rect.top
+			ball.speedy = -ball.speedy
 
 	# Checar colisiones - ball - borde8
 	if pygame.sprite.collide_rect(ball,borde8):
@@ -632,7 +625,7 @@ while running:
 		if ball.speedx < 0:
 			pass
 		
-	screen.blit(background, [0, 0])
+	#screen.blit(background, [0, 0])
 	for w in walls:
 		w.draw(screen)
 	all_sprites.draw(screen)
